@@ -394,7 +394,7 @@ router.put("/:id", async (req, res) => {
     case 1:
       nextActionRequest = 2; // status 'EM PREPARAÇÃO'
       descriptionNextActionRequest = "Em Preparação";
-      message = "Seu pedido está preparação.";
+      message = "Pedido recebido em fila de preparação.";
       break;
     // Pedido em Preparação
     case 2:
@@ -408,7 +408,7 @@ router.put("/:id", async (req, res) => {
         // RETIRAR NA LOJA
         nextActionRequest = 4; // status 'RETIRAR NA LOJA'
         descriptionNextActionRequest = "Retirar na Loja";
-        message = "Seu pedido esta pronto para retirar na loja.";
+        message = "Seu pedido está pronto para ser retirado na loja.";
       }
       break;
     // Entrega Realizada

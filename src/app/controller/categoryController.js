@@ -71,7 +71,9 @@ router.post("/create", upload.single("image"), async (req, res) => {
     return res.json({
       categoryId: categoryId[0],
       TotalProduct: 0,
+      categoryVisible: true,
       name: categoryData.name,
+      image: pathImage,
       image_url: `${process.env.HOST}/uploads/${categoryData.image}`,
     });
   } catch (error) {
@@ -83,10 +85,31 @@ router.post("/create", upload.single("image"), async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
 
+  // Excluir a image do servidor, pesquisando dados completos da categoria
+  const dataCategory = await connection("category")
+    .where("id", "=", id)
+    .first();
+
+  // Categoria localizada
+  if (typeof dataCategory !== "undefined") {
+    //Capturando o path do arquivo
+    const pathFile = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "uploads",
+      dataCategory.image
+    );
+
+    //Checar se o aquivo existe no servidor
+    if (fs.existsSync(pathFile)) {
+      dataCategory.image !== "default.jpg" && fs.unlinkSync(pathFile);
+    }
+  }
+  // Excluir dados da categoria do banco de dados
   const category = await connection("category").where("id", "=", id).delete();
-
   req.io.emit("Update", { update: category });
-
   return res.json({
     message: category ? "Excluído com sucesso" : "Falha na exclusão.",
   });

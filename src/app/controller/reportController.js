@@ -22,11 +22,11 @@ router.get("/saleDay", async (req, res) => {
   // formatar data no formato ISO 8601
   let dateStart = from.getFullYear().toString() + "-";
   dateStart += (from.getMonth() + 1).toString().padStart(2, "0") + "-";
-  dateStart += from.getDate().toString().padStart(2, "0") + "T03:00:00";
+  dateStart += from.getDate().toString().padStart(2, "0") + "T03:00:00Z";
 
   let dateEnd = to.getFullYear().toString() + "-";
   dateEnd += (to.getMonth() + 1).toString().padStart(2, "0") + "-";
-  dateEnd += to.getDate().toString().padStart(2, "0") + "T02:59:59";
+  dateEnd += to.getDate().toString().padStart(2, "0") + "T02:59:59Z";
 
   const saleDay = await connection("request")
     .where("dateTimeOrder", ">", dateStart)
@@ -73,14 +73,16 @@ router.get("/saleWeek", async (req, res) => {
     Number(week) === 0 ? 6 : Number(week - 1)
   );
   // Dia do termino da semana
-  const dateEnd = dateFns.addDays(dateStart, 6);
+  const dateEnd = dateFns.addDays(dateStart, 7);
 
-  const from = `${dateStart.getFullYear()}-${
-    dateStart.getMonth() + 1
-  }-${dateStart.getDate()}T03:00:00.000`;
-  const to = `${dateEnd.getFullYear()}-${dateEnd.getMonth() + 1}-${
-    dateEnd.getDate() + 1
-  }T02:59:59.000`;
+  // formatar data no formato ISO 8601
+  let from = dateStart.getFullYear().toString() + "-";
+  from += (dateStart.getMonth() + 1).toString().padStart(2, "0") + "-";
+  from += dateStart.getDate().toString().padStart(2, "0") + "T03:00:00Z";
+
+  let to = dateEnd.getFullYear().toString() + "-";
+  to += (dateEnd.getMonth() + 1).toString().padStart(2, "0") + "-";
+  to += dateEnd.getDate().toString().padStart(2, "0") + "T02:59:59Z";
 
   const saleWeek = await connection("request")
     .whereBetween("dateTimeOrder", [from, to])
@@ -129,7 +131,7 @@ router.get("/saleWeek", async (req, res) => {
   });
 
   return res.json({
-    interval: { dateStart, dateEnd },
+    interval: { from, to },
     data: [
       totalMon,
       totalTue,

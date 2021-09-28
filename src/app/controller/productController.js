@@ -8,6 +8,7 @@ const uploadConfig = require("../../config/upload");
 const connection = require("../../database/connection");
 const authMiddleware = require("../middleware/auth");
 const headersAuth = require("../middleware/headersAuth");
+const { pushNotificationAllUsers } = require("../utils/pushNotification");
 const router = express.Router();
 const upload = multer(uploadConfig);
 
@@ -37,8 +38,7 @@ router.get("/all", async (req, res) => {
   }
 
   let isAdmin;
-
-  if (userId === null) {
+  if (userId === null || typeof userId === "undefined") {
     isAdmin = [true];
   } else {
     const user = await connection("users").where("id", "=", userId).first();
@@ -96,7 +96,7 @@ router.get("/", async (req, res) => {
 
   let isAdmin;
 
-  if (userId === null) {
+  if (userId === null || typeof userId === "undefined") {
     isAdmin = [true];
   } else {
     const user = await connection("users").where("id", "=", userId).first();
@@ -182,7 +182,7 @@ router.get("/all/:search", async (req, res) => {
 
   let isAdmin;
 
-  if (userId === null) {
+  if (userId === null || typeof userId === "undefined") {
     isAdmin = [true];
   } else {
     const user = await connection("users").where("id", "=", userId).first();
@@ -232,7 +232,7 @@ router.get("/promotion", async (req, res) => {
   const userId = req.userId;
   let isAdmin;
 
-  if (userId === null) {
+  if (userId === null || typeof userId === "undefined") {
     isAdmin = [true];
   } else {
     const user = await connection("users").where("id", "=", userId).first();
@@ -308,6 +308,7 @@ router.post("/create", upload.single("image"), async (req, res) => {
     measureUnid_id,
     visibleApp,
     additional,
+    valueDefautAdditional,
   } = req.body;
 
   const schema = Yup.object().shape({
@@ -331,6 +332,7 @@ router.post("/create", upload.single("image"), async (req, res) => {
     promotion: format.isboolean(promotion),
     pricePromotion: format.isboolean(promotion) ? Number(pricePromotion) : 0,
     additional,
+    valueDefautAdditional,
     category_id: Number(category_id),
     measureUnid_id: Number(measureUnid_id),
     visibleApp: format.isboolean(visibleApp),
@@ -413,6 +415,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     measureUnid_id,
     visibleApp,
     additional,
+    valueDefautAdditional,
   } = req.body;
 
   const requestImage = req.file;
@@ -452,6 +455,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       category_id: Number(category_id),
       measureUnid_id: Number(measureUnid_id),
       additional,
+      valueDefautAdditional,
       visibleApp: format.isboolean(visibleApp),
     };
     // Excluir o arquivo do produto antigo
@@ -464,6 +468,14 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     await connection("product").where("id", "=", id).update(productUpdate);
 
     req.io.emit("Update", { update: Date.now() });
+
+    // Enviar para notificação push
+    if (productUpdate.promotion) {
+      pushNotificationAllUsers(
+        "PROMOÇÃO",
+        `${name.toUpperCase()} por apenas R$ ${pricePromotion} `
+      );
+    }
 
     return res.json({
       success: true,

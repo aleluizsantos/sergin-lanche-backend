@@ -6,9 +6,19 @@ const Yup = require("yup");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
+  const userId = req.userId;
   const { additional } = req.headers;
+
+  let isAdmin;
+  if (userId === null || typeof userId === "undefined") {
+    isAdmin = [true];
+  } else {
+    const user = await connection("users").where("id", "=", userId).first();
+    isAdmin = user.typeUser === "admin" ? [true, false] : [true];
+  }
   // Transformar a lista de String em array
   const listAdditional = additional.split(",");
+
   try {
     const additional = await connection("additional")
       .whereIn("additional.typeAdditional_id", listAdditional)
@@ -17,16 +27,19 @@ router.get("/", async (req, res) => {
         "additional.typeAdditional_id",
         "typeAdditional.id"
       )
+      .whereIn("typeAdditional.typeAdditionVisible", isAdmin)
       .orderBy("typeAdditional_id", "asc")
       .orderBy("description", "asc")
       .select(
         "additional.*",
         "typeAdditional.description as typeAdditional",
+        "typeAdditional.typeAdditionVisible",
+        "typeAdditional.limitAdditional",
         "typeAdditional.manySelected"
       );
     return res.json(additional);
   } catch (error) {
-    return res.json({ error: error.message });
+    return res.json([]);
   }
 });
 

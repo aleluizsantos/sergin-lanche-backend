@@ -33,13 +33,24 @@ module.exports = {
   },
   /**
    * Push Notifivication grupo de usuários
-   * @param {Array} users Lista de token para enviar push
+   * @param {Array} usersToken Lista de token para enviar push
    * @param {String} message Mensagem a ser enviada para o grupo
    */
-  async pushNotificationGruop(users, title = "", message) {
+  async pushNotificationGruop(usersToken, title = "", message) {
     // Enviar push para todos os usuários
-    users.map(async (user) => {
-      await pushNotification(user, title, message);
+    usersToken.map(async (userToken) => {
+      await pushNotification(userToken, title, message);
+    });
+  },
+
+  async pushNotificationAllUsers(title = "", message) {
+    const usersToken = await connection("users")
+      .where("typeUser", "=", "user")
+      .select("tokenPushNotification");
+
+    usersToken.map(async (userToken) => {
+      console.log(userToken.tokenPushNotification);
+      await pushNotification(userToken.tokenPushNotification, title, message);
     });
   },
 };
