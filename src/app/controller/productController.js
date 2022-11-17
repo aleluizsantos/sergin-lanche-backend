@@ -411,10 +411,10 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     price,
     promotion,
     pricePromotion,
+    additional,
+    visibleApp,
     category_id,
     measureUnid_id,
-    visibleApp,
-    additional,
     valueDefautAdditional,
   } = req.body;
 

@@ -11,6 +11,7 @@ exports.up = async function (knex) {
     table.boolean("blocked").defaultTo(false);
     table.timestamp("created_at").defaultTo(knex.fn.now());
     table.string("tokenPushNotification").nullable();
+    
   });
 };
 

@@ -9,7 +9,8 @@ const errorHandler = require("./errors/handler");
 const app = express();
 
 const { NODE_INSTANCE } = process.env;
-const PORT = 4000 + parseInt(NODE_INSTANCE);
+const PORT = process.env.PORT;
+const HOST = process.env.HOST;
 
 //Fazer com que a aplicação ousa tanto o protocolo http quanto socket
 const server = require("http").Server(app);
@@ -33,7 +34,7 @@ app.use("/uploads", express.static(path.resolve(__dirname, "..", "uploads")));
 require("./app/controller/index")(app);
 
 server.listen(process.env.PORT || PORT, function () {
-  console.log(`>> Servidor online in Port ${PORT}`);
+  console.log(`>> Servidor online in ${HOST}`);
 });
 
 let clients = [];

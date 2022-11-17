@@ -1,6 +1,7 @@
 const connection = require("../../database/connection");
 const express = require("express");
 const authMiddleware = require("../middleware/auth");
+const { getOrder } = require("../hooks/myOrders");
 const { validationCoupon } = require("../utils/validationCupon");
 const { pushNotificationUser } = require("../utils/pushNotification");
 
@@ -8,8 +9,6 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-// Listar itens de um pedido
-// http://dominio/request/items
 router.get("/items/:id", async (req, res) => {
   const { id } = req.params; //Id do pedido;
 
@@ -74,63 +73,8 @@ router.get("/group", async (req, res) => {
 // Listar todos os pedidos especifico de um usuário
 // http://dominio/request
 router.get("/", async (req, res) => {
-  const user_id = req.userId; //Id do usuário recebido no token;
-  const { statusrequest } = req.headers; //Recebendo um STRING de Status de Pedido
-
-  // Verificar os parametros
-  if (!!!statusrequest)
-    return res.json({ Message: "Falta do parametro 'statusRequest'" });
-
-  // Convertendo a String em um ARRAY
-  const statusRequest = statusrequest.split(",").map((req) => req.trim());
-
-  // Identificar o tipo do usuário
-  const user = await connection("users")
-    .where("id", "=", user_id)
-    .first()
-    .select("id", "name", "email", "phone", "typeUser");
-
-  //Verificando o tipo de usuário é ADMIN
-  if (user.typeUser === "admin") {
-    //Listagem para usuário administrador
-    const request = await connection("request")
-      .whereIn("statusRequest_id", statusRequest)
-      .join("users", "request.user_id", "users.id")
-      .join("deliveryType", "request.deliveryType_id", "deliveryType.id")
-      .join("statusRequest", "request.statusRequest_id", "statusRequest.id")
-      .join("payment", "request.payment_id", "payment.id")
-      .select(
-        "request.*",
-        "users.name",
-        "users.email",
-        "users.phone",
-        "deliveryType.description As deliveryType",
-        "statusRequest.description As statusRequest",
-        "statusRequest.BGcolor",
-        "payment.type As payment"
-      )
-      .orderBy("request.dateTimeOrder", "desc");
-
-    return res.json(request);
-  } else {
-    //Listagem para usuário comum - APENAS PEDIDO DELE
-    const request = await connection("request")
-      .where("user_id", "=", user_id)
-      .whereIn("statusRequest_id", statusRequest)
-      .join("deliveryType", "request.deliveryType_id", "deliveryType.id")
-      .join("statusRequest", "request.statusRequest_id", "statusRequest.id")
-      .join("payment", "request.payment_id", "payment.id")
-      .select(
-        "request.*",
-        "deliveryType.description As deliveryType",
-        "statusRequest.description As statusRequest",
-        "statusRequest.BGcolor",
-        "payment.type As payment"
-      )
-      .orderBy("request.id", "desc");
-
-    return res.json(request);
-  }
+  const order = await getOrder(req);
+  return res.json(order);
 });
 // Criar um pedido
 // http://dominio/request
@@ -194,10 +138,8 @@ router.post("/create", async (req, res) => {
     }
 
     //Converter a string que contém o itens adicionais
-    const itemsAdditional = items.map((item, idx) => {
-      const additional = item.additionItem.split(",");
-      return additional;
-    });
+    const itemsAdditional = items.map((item) => item.additionItem.split(","));
+
     // converter a String do additional em apenas um array
     const listIdAdditional = itemsAdditional
       .toString()
@@ -221,10 +163,12 @@ router.post("/create", async (req, res) => {
     const request = {
       dateTimeOrder: dataCurrent,
       totalPurchase: vTaxaDelivery + totalPur - vDiscount,
+      cash: cash || 0,
       vTaxaDelivery: vTaxaDelivery,
       coupon,
       discount: vDiscount,
       note,
+      timeDelivery: timeDelivery || "60-80 min",
       address,
       number,
       neighborhood,
@@ -235,8 +179,6 @@ router.post("/create", async (req, res) => {
       deliveryType_id: Number(deliveryType_id),
       statusRequest_id: Number(statusRequest_id),
       payment_id: Number(payment_id),
-      cash: cash || 0,
-      timeDelivery: timeDelivery || "60-80 min",
     };
 
     const trx = await connection.transaction();
@@ -283,16 +225,22 @@ router.post("/create", async (req, res) => {
     // Efetivar a gravação se tudo ocorrer com sucesso na inserção do pedido e
     // dos itens casos contrário desfaça tudo
     await trx.commit();
+
     // contar todos os pedidos em anlise
-    const ordersAnalize = await connection("request")
-      .count("statusRequest_id as countReq")
-      .where("statusRequest_id", "=", 1)
-      .first();
+    // const ordersAnalize = await connection("request")
+    //   .count("statusRequest_id as countReq")
+    //   .where("statusRequest_id", "=", 1)
+    //   .first();
     // emitir aviso que foi creado um no Pedido
     // retornando a quantidade de pedidos em analise
-    req.io.emit("CreateOrder", {
-      newOrder: ordersAnalize,
+
+    //Buscar todo o pedido que foi inserido
+    getOrder(req).then((resp) => {
+      req.io.emit("CreateOrder", {
+        CreateOrder: resp,
+      });
     });
+
     // Retorna o Pedido e os itens
     return res.json({ request, itemsRequest });
   } catch (error) {
@@ -442,7 +390,6 @@ router.put("/:id", async (req, res) => {
 
   return res.status(200).json({
     success: Boolean(upgradeRequest),
-    success: true,
     user_id: user_id,
     nextState: nextActionRequest,
     descriptionNextActionRequest: descriptionNextActionRequest,
