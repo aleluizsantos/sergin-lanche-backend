@@ -1,10 +1,10 @@
 exports.seed = async function (knex) {
   await knex("users").insert([
     {
-      name: "Sergin Lanche",
+      name: "Administrador",
       email: "admin@admin.com",
       phone: "(17) 3632-9350",
-      password: "$2a$10$ag3gNBv9wXR43I0FOjY6weW9pBkSytFavLxUdkf7EWB75BDyKmvPm",
+      password: "$2a$10$s4F6xxvM/sesHdtbvyK/J.JJiOyYKXs.7ejhwOAClZbhtEuvqiMhC",
       typeUser: "admin",
       blocked: "false",
     },
