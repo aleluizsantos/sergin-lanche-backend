@@ -13,6 +13,29 @@ function generateToken(params = {}) {
   });
 }
 
+router.get("/checkToken/:token", async (req, res) => {
+  // const user_id = req.userId;
+  const { token } = req.params;
+
+  let valueToken = token;
+
+  const parts = token.split(" "); //Separar as duas partes
+  //Realizar destruturação separando o Bearer e token
+  const [scheme, mytoken] = parts;
+
+  if (/^Bearer$/i.test(scheme)) valueToken = mytoken;
+  //Fazer a verificação do token usando jwt-(Json Web Token)
+  jwt.verify(valueToken, process.env.AUTH_SECRET, async (err) => {
+    if (err)
+      return res.json({
+        status: false,
+        message: "Token inválido, Realize o login, ou recadstre novamente.",
+      });
+
+    return res.json({ status: true, message: "Token válido." });
+  });
+});
+
 // Criar um usuário
 // http://dominio/auth/register
 router.post("/register", async (req, res) => {
@@ -105,20 +128,6 @@ router.post("/authenticate", async (req, res) => {
 });
 
 router.use(authMiddleware);
-
-router.get("/checkToken/:token", async (req, res) => {
-  const user_id = req.userId;
-  const { token } = req.params;
-  //Fazer a verificação do token usando jwt-(Json Web Token)
-  jwt.verify(token, process.env.AUTH_SECRET, async (err) => {
-    if (err) {
-      const refreshToken = generateToken({ id: user_id });
-      return res.json({ refreshToken: true, token: refreshToken });
-    }
-
-    return res.json({ refreshToken: false });
-  });
-});
 // Listar todos usuários cadastrados
 // http:dominio/auth/users
 router.get("/users", async (req, res) => {
