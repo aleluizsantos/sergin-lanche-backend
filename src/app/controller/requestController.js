@@ -226,19 +226,12 @@ router.post("/create", async (req, res) => {
     // dos itens casos contrário desfaça tudo
     await trx.commit();
 
-    // contar todos os pedidos em anlise
-    // const ordersAnalize = await connection("request")
-    //   .count("statusRequest_id as countReq")
-    //   .where("statusRequest_id", "=", 1)
-    //   .first();
-    // emitir aviso que foi creado um no Pedido
-    // retornando a quantidade de pedidos em analise
-
     //Buscar todo o pedido que foi inserido
     getOrder(req).then((resp) => {
       req.io.emit("CreateOrder", {
         CreateOrder: resp,
       });
+      req.io.emit("Update", { update: Date.now() });
     });
 
     // Retorna o Pedido e os itens
