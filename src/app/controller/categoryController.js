@@ -155,7 +155,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     // Checar se o arquivo existe no servidor
     if (fs.existsSync(pathFileOld)) {
       // Excluir o arquivo da imagem antiga
-      fs.unlinkSync(pathFileOld);
+      nameImageCurrent !== "default.jpg" && fs.unlinkSync(pathFileOld);
     }
   } else {
     nameImage = nameImageCurrent;
