@@ -231,7 +231,6 @@ router.post("/create", async (req, res) => {
       req.io.emit("CreateOrder", {
         CreateOrder: resp,
       });
-      req.io.emit("Update", { update: Date.now() });
     });
 
     // Retorna o Pedido e os itens
