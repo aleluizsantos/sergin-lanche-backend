@@ -81,6 +81,7 @@ router.get("/", async (req, res) => {
 router.post("/create", async (req, res) => {
   const dataCurrent = new Date(); //Data atual
   const user_id = req.userId; //Id do usuário recebido no token;
+  let vDiscount = 0;
 
   // Dados recebidos na requisição no body
   const {
@@ -129,29 +130,28 @@ router.post("/create", async (req, res) => {
       return total + Number(item.amount) * Number(item.price);
     }, 0);
 
-    let vDiscount = 0;
-
     //Verificação do cupom, autenticidade e validade
     if (coupon !== "") {
       const vcoupon = await validationCoupon(coupon);
       vDiscount = vcoupon.error ? 0 : Number(vcoupon.discountAmount);
     }
 
-    //Converter a string que contém o itens adicionais
+    // Converter a string que contém o itens adicionais em ARRAY
     const itemsAdditional = items.map((item) => item.additionItem.split(","));
 
-    // converter a String do additional em apenas um array
+    // Converter a String do additional em apenas um array
     const listIdAdditional = itemsAdditional
       .toString()
       .split(",")
       .map((item) => Number(item));
 
+    // Somar o valor de todos os adicionais
     const totalAdditional = await connection("additional")
       .whereIn("id", listIdAdditional)
       .sum("price as total")
       .first();
 
-    // Acrescentar o total dos adicionais
+    // Incluir o total do Adicionais no valor TOTAL da compra
     totalPur += Number(totalAdditional.total);
 
     // Checando a taxa de entrega
@@ -159,7 +159,7 @@ router.post("/create", async (req, res) => {
     // Checar se o total gasto é maior ou igual a taxa minima de entrega
     const vTaxaDelivery = totalPur >= vMinTaxa ? 0 : parseFloat(taxa);
 
-    // montar os dados do pedido para ser inseridos
+    // Montar os dados do pedido para ser inseridos
     const request = {
       dateTimeOrder: dataCurrent,
       totalPurchase: vTaxaDelivery + totalPur - vDiscount,
@@ -200,7 +200,7 @@ router.post("/create", async (req, res) => {
     //Inserir os items do pedido retornando todos os id dos items
     const idItemsInsert = await trx("itemsRequets").insert(itemsRequest, "id");
 
-    // // Criar um array vazio para ser inserido os itens adicionais para serem inseridos
+    // Criar um array vazio para ser inserido os itens adicionais para serem inseridos
     let insertItemAddicional = [];
 
     // Para cada itens inserido, inserir o addicionais no banco
@@ -226,7 +226,7 @@ router.post("/create", async (req, res) => {
     // dos itens casos contrário desfaça tudo
     await trx.commit();
 
-    //Buscar todo o pedido que foi inserido
+    // Buscar todo o pedido que foi inserido
     getOrder(req).then((resp) => {
       req.io.emit("CreateOrder", {
         CreateOrder: resp,

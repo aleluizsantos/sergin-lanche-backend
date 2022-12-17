@@ -5,11 +5,11 @@ module.exports = {
   development: {
     client: "postgresql",
     connection: {
-      host: process.env.RDS_HOSTNAME,
-      port: process.env.RDS_PORT,
-      database: process.env.RDS_DB_NAME,
-      user: process.env.RDS_USERNAME,
-      password: process.env.RDS_PASSWORD,
+      host: process.env.DEV_HOSTNAME,
+      port: process.env.DEV_PORT,
+      database: process.env.DEV_DB_NAME,
+      user: process.env.DEV_USERNAME,
+      password: process.env.DEV_PASSWORD,
     },
     pool: {
       min: 2,

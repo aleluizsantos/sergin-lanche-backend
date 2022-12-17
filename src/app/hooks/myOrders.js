@@ -15,6 +15,7 @@ const useOrder = {
    */
   getItemOrder: async (orderId) => listItemOrder(orderId),
 };
+
 module.exports = useOrder;
 
 const orders = async (request) => {
@@ -79,7 +80,7 @@ const listOrderUser = async (request, userId) => {
     let arrayStatusreq;
     // Convertendo a String em um ARRAY
     if (!statusrequest) {
-      arrayStatusreq = [1, 2, 3, 4, 5, 6];
+      arrayStatusreq = [1];
     } else {
       arrayStatusreq = statusrequest.split(",").map((req) => req.trim());
     }
