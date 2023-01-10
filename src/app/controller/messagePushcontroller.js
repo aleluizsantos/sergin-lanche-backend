@@ -20,7 +20,7 @@ router.post("/send", async (req, res) => {
     return res.json({ error: "Parametros incorretos." });
   }
   // Enviar para notificação push
-  pushNotificationGruop(tokenPush, title, message);
+  pushNotificationGruop(tokenPush, message, title);
   return res.send();
 });
 

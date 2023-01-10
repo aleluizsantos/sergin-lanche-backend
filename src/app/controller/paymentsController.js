@@ -16,6 +16,7 @@ router.get("/", async (req, res) => {
       id: pay.id,
       type: pay.type,
       image_url: `${process.env.HOST}/uploads/${pay.image}`,
+      key_pix: pay.key_pix,
     };
   });
 

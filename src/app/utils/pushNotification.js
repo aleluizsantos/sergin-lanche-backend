@@ -1,11 +1,11 @@
 const fetch = require("cross-fetch");
 const connection = require("../../database/connection");
 
-const pushNotification = async (token, title, msg) => {
+const pushNotification = async (token, msg, title = "Sergin Lanche") => {
   const message = {
     to: token,
     sound: "default",
-    title: title || "Picanha & Cia ",
+    title: title,
     body: msg,
   };
 
@@ -36,10 +36,10 @@ module.exports = {
    * @param {Array} usersToken Lista de token para enviar push
    * @param {String} message Mensagem a ser enviada para o grupo
    */
-  async pushNotificationGruop(usersToken, title = "", message) {
+  async pushNotificationGruop(usersToken, message, title = "") {
     // Enviar push para todos os usuários
     usersToken.map(async (userToken) => {
-      await pushNotification(userToken, title, message);
+      await pushNotification(userToken, message, title);
     });
   },
 
@@ -50,7 +50,7 @@ module.exports = {
 
     usersToken.map(async (userToken) => {
       console.log(userToken.tokenPushNotification);
-      await pushNotification(userToken.tokenPushNotification, title, message);
+      await pushNotification(userToken.tokenPushNotification, message, title);
     });
   },
 };

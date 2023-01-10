@@ -249,14 +249,14 @@ router.get("/salePeriod", async (req, res) => {
 router.get("/top10", async (req, res) => {
   // Top 10 do melhores cliente
   const top10Client = await connection("request")
-    .groupBy("user_id", "address", "users.name")
+    .groupBy("user_id", "users.name")
     .join("users", "request.user_id", "users.id")
     .count("user_id as amountOrder")
     .sum("totalPurchase as totalPur")
-    .orderBy("amountOrder", "desc")
     .orderBy("totalPur", "desc")
+    .orderBy("amountOrder", "desc")
     .limit(10)
-    .select("request.user_id", "request.address", "users.name");
+    .select("request.user_id", "users.name");
 
   // Top 10 do Produtos
   const top10Product = await connection("itemsRequets")

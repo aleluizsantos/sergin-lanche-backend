@@ -472,7 +472,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     // Enviar para notificação push
     if (productUpdate.promotion) {
       pushNotificationAllUsers(
-        "PROMOÇÃO",
+        "PROMOÇÃO - Sergin Lanche",
         `${name.toUpperCase()} por apenas R$ ${pricePromotion} `
       );
     }

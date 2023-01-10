@@ -1,7 +1,7 @@
 const connection = require("../../database/connection");
 const express = require("express");
 const authMiddleware = require("../middleware/auth");
-const { getOrder } = require("../hooks/myOrders");
+const { getOrder, getAdditional } = require("../hooks/myOrders");
 const { validationCoupon } = require("../utils/validationCupon");
 const { pushNotificationUser } = require("../utils/pushNotification");
 
@@ -82,6 +82,7 @@ router.post("/create", async (req, res) => {
   const dataCurrent = new Date(); //Data atual
   const user_id = req.userId; //Id do usuário recebido no token;
   let vDiscount = 0;
+  let vTaxaDelivery = 0;
 
   // Dados recebidos na requisição no body
   const {
@@ -116,18 +117,27 @@ router.post("/create", async (req, res) => {
           ? dataPrice.pricePromotion
           : dataPrice.price;
 
+        const { listAdditinal, additionalSum } = await getAdditional(
+          item.additionItem
+        );
+
         return {
           amount: Number(item.amount),
           product_id: Number(item.product_id),
           price: priceProduct,
+          AdditionalSum: additionalSum,
           note: item.note,
+          additionalItem: listAdditinal,
         };
       })
     );
 
     // Calcular o total do carrinho
     let totalPur = await dataItems.reduce(function (total, item) {
-      return total + Number(item.amount) * Number(item.price);
+      const amount = Number(item.amount);
+      const price = Number(item.price) + Number(item.AdditionalSum);
+
+      return total + amount * price;
     }, 0);
 
     //Verificação do cupom, autenticidade e validade
@@ -136,28 +146,13 @@ router.post("/create", async (req, res) => {
       vDiscount = vcoupon.error ? 0 : Number(vcoupon.discountAmount);
     }
 
-    // Converter a string que contém o itens adicionais em ARRAY
-    const itemsAdditional = items.map((item) => item.additionItem.split(","));
-
-    // Converter a String do additional em apenas um array
-    const listIdAdditional = itemsAdditional
-      .toString()
-      .split(",")
-      .map((item) => Number(item));
-
-    // Somar o valor de todos os adicionais
-    const totalAdditional = await connection("additional")
-      .whereIn("id", listIdAdditional)
-      .sum("price as total")
-      .first();
-
-    // Incluir o total do Adicionais no valor TOTAL da compra
-    totalPur += Number(totalAdditional.total);
-
     // Checando a taxa de entrega
     const { vMinTaxa, taxa } = await connection("taxaDelivery").first();
     // Checar se o total gasto é maior ou igual a taxa minima de entrega
-    const vTaxaDelivery = totalPur >= vMinTaxa ? 0 : parseFloat(taxa);
+    if (deliveryType_id === 1) {
+      vTaxaDelivery =
+        totalPur >= vMinTaxa && vMinTaxa > 0 ? 0 : parseFloat(taxa);
+    }
 
     // Montar os dados do pedido para ser inseridos
     const request = {
@@ -197,27 +192,25 @@ router.post("/create", async (req, res) => {
       };
     });
 
-    //Inserir os items do pedido retornando todos os id dos items
+    // Inserir os items do pedido retornando todos os id dos items
     const idItemsInsert = await trx("itemsRequets").insert(itemsRequest, "id");
 
     // Criar um array vazio para ser inserido os itens adicionais para serem inseridos
     let insertItemAddicional = [];
 
     // Para cada itens inserido, inserir o addicionais no banco
-    idItemsInsert.map((item, idx) => {
-      for (let i = idx; i <= idx; i++) {
-        const element = itemsAdditional[i];
-        element.forEach((itemAddit) => {
-          if (itemAddit !== "") {
-            insertItemAddicional.push({
-              itemOrder_id: item,
-              additional_id: itemAddit,
-              request_id: Number(request_id),
-            });
-          }
-        });
+    for (const [idx, idItem] of idItemsInsert.entries()) {
+      for (let index = idx; index <= idx; index++) {
+        const element = dataItems[index];
+        for (const addit of element.additionalItem) {
+          insertItemAddicional.push({
+            itemOrder_id: idItem,
+            additional_id: addit.id,
+            request_id: Number(request_id),
+          });
+        }
       }
-    });
+    }
 
     // Inserir os items dos adicionais
     await trx("additionalItemOrder").insert(insertItemAddicional);
@@ -228,8 +221,10 @@ router.post("/create", async (req, res) => {
 
     // Buscar todo o pedido que foi inserido
     getOrder(req).then((resp) => {
+      // Pegar apenas o Pedido que foi feito
+      const myOrder = resp.filter((item) => item.id === request_id);
       req.io.emit("CreateOrder", {
-        CreateOrder: resp,
+        CreateOrder: myOrder,
       });
     });
 
@@ -309,56 +304,65 @@ router.put("/itemChanger", async (req, res) => {
   }
 });
 // Alterar Status de um Pedido pedido
-// http://dominio/request/:id
-router.put("/:id", async (req, res) => {
-  const { id } = req.params;
+// http://dominio/request
+router.put("/", async (req, res) => {
+  // FASE DO DELIVERY
+  // 1=>Em análise | 2=>Em Preparação | 3=>Rota de Entrega | 6=>Finalizado
+  // 1=>Em análise | 2=>Em Preparação | 4=>Retirar na Loja | 6=>Finalizado
 
-  const request = await connection("request")
-    .where("id", "=", id)
-    .select("*")
-    .first();
+  const { id, user_id, nextStage, deliveryType_id } = req.body;
 
-  if (typeof request === "undefined")
-    return res.json({ error: "Falha na atualização" });
+  if (!id) return res.json({ error: "Falta de parametro" });
 
-  const statusRequest = request.statusRequest_id;
-  const typeDelivery = request.deliveryType_id;
-  const user_id = request.user_id;
+  let stage = nextStage;
+
+  // VERIFICAR SE O TIPO DE ENTREGA É 1=DELIVERY
+  if (deliveryType_id === 1) {
+    if (nextStage === 4) stage = 6;
+  }
+  // VERIFICAR SE O TIPO DE ENTREGA É 2=RETIRADA NA LOJA
+  if (deliveryType_id === 2) {
+    if (nextStage === 3) stage = 4;
+    if (nextStage === 5) stage = 6;
+  }
 
   let nextActionRequest;
   let descriptionNextActionRequest;
   let message;
   // Alteração do STATUS
-  switch (statusRequest) {
-    // Produto Status 'EM ANALISE'
+  switch (stage) {
+    // PEDIDO RECEBIDO - EM ANÁLISE
     case 1:
+      nextActionRequest = 1; // status 'EM PREPARAÇÃO'
+      descriptionNextActionRequest = "Em Preparação";
+      message = "Recebemos seu pedido, já estamos encaminhado para preparo.";
+      break;
+    // PEDIDO EM PREPARAÇÃO
+    case 2:
       nextActionRequest = 2; // status 'EM PREPARAÇÃO'
       descriptionNextActionRequest = "Em Preparação";
       message = "Pedido recebido em fila de preparação.";
       break;
-    // Pedido em Preparação
-    case 2:
-      // 1=DELIVERY || 2=RETIRAR LOJA
-      if (typeDelivery === 1) {
-        // DELIVERY
-        nextActionRequest = 3; // status 'ROTA DE ENTREGA'
-        descriptionNextActionRequest = "Rota de Entrega";
-        message = "Seu pedido está em rota de entrega.";
-      } else {
-        // RETIRAR NA LOJA
-        nextActionRequest = 4; // status 'RETIRAR NA LOJA'
-        descriptionNextActionRequest = "Retirar na Loja";
-        message = "Seu pedido está pronto para ser retirado na loja.";
-      }
-      break;
-    // Entrega Realizada
+    // ROTA DE ENTREGA
     case 3:
-      nextActionRequest = 6; // status 'FINALIADO' - entrega concluída
-      descriptionNextActionRequest = "Finalizado";
-      message = "Pedido Finalizado, obrigado pela preferência.";
+      // DELIVERY
+      nextActionRequest = 3; // status 'ROTA DE ENTREGA'
+      descriptionNextActionRequest = "Rota de Entrega";
+      message = "Seu pedido está em rota de entrega.";
+      break;
+    // RETIRAR NA LOJA
+    case 4:
+      // Retirada
+      nextActionRequest = 4; // status 'RETIRAR NA LOJA'
+      descriptionNextActionRequest = "Retirar na Loja";
+      message = "Seu pedido está pronto para ser retirado na loja.";
+    case 5:
+      nextActionRequest = 5; // status 'Agenda'
+      descriptionNextActionRequest = "Agendado";
+      message = "Pedido agendado, obrigado pela preferência.";
       break;
     // Retirada Realizada
-    case 4:
+    case 6:
       nextActionRequest = 6; // status 'FINALIADO' - Retirada concluída
       descriptionNextActionRequest = "Finalizado";
       message = "Pedido Finalizado, obrigado pela preferência.";
@@ -370,13 +374,11 @@ router.put("/:id", async (req, res) => {
   // Atualizar o status do pedido
   const upgradeRequest = await connection("request")
     .where("id", "=", id)
-    .update({
-      ...request,
-      statusRequest_id: nextActionRequest,
-    });
+    .update({ statusRequest_id: stage });
 
-  // Enviar pushNotification  par ao usuário
-  pushNotificationUser(user_id, message);
+  // Enviar pushNotification para o usuário
+  stage > 1 && pushNotificationUser(user_id, message);
+
   // Enviar notificação via socket-io
   req.io.emit("Update", { update: Date.now(), userId: user_id });
 
@@ -386,6 +388,20 @@ router.put("/:id", async (req, res) => {
     nextState: nextActionRequest,
     descriptionNextActionRequest: descriptionNextActionRequest,
   });
+});
+// Alterar colocar com true a impressão
+// http://dominio/request/:id
+router.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  // Atualizar a impressão do cupom
+  const upgradeRequest = await connection("request")
+    .where("id", "=", id)
+    .update({ print: true });
+
+  // Enviar notificação via socket-io
+  req.io.emit("Update", { update: Date.now() });
+
+  return res.json({ success: upgradeRequest });
 });
 // Excluir um item do pedido
 router.delete("/delete/item/:requestId/:itemId", async (req, res) => {

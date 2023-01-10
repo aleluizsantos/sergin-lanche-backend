@@ -4,7 +4,7 @@ const { getUser } = require("../hooks/users");
 const useOrder = {
   /**
    * Retorna uma lista com os pedidos
-   * @param {Request} request - parametro HEADER: statusrequest
+   * @param {Request} request - Recebe a requisição BODY e parametro HEADER: statusrequest
    * @returns {JSON} retorna um json com os pedidos
    */
   getOrder: async (request) => await orders(request),
@@ -14,6 +14,13 @@ const useOrder = {
    * @returns {JSON} Json com os itens do pedido.
    */
   getItemOrder: async (orderId) => listItemOrder(orderId),
+
+  /**
+   * Retorna uma lista dos adicionais e o valor total deles.
+   * @param {String} additional Recebe os ID dos adicionais selecionado
+   * @returns {object} Objeto contendo 'listAdditinal', 'additionalSum'
+   */
+  getAdditional: async (additional) => listAdditionalStringObject(additional),
 };
 
 module.exports = useOrder;
@@ -62,11 +69,19 @@ const listAllOrder = async (request) => {
         "deliveryType.description As deliveryType",
         "statusRequest.description As statusRequest",
         "statusRequest.BGcolor",
-        "payment.type As payment"
+        "payment.type As payment",
+        "payment.image"
       )
       .orderBy("request.dateTimeOrder", "desc");
 
-    const itemOrder = await listItemOrder(response);
+    const serialezeOrder = response.map((item) => {
+      return {
+        ...item,
+        image: `${process.env.HOST}/uploads/${item.image}`,
+      };
+    });
+
+    const itemOrder = await listItemOrder(serialezeOrder);
 
     return itemOrder;
   } catch (error) {
@@ -87,19 +102,31 @@ const listOrderUser = async (request, userId) => {
     const response = await connection("request")
       .where("user_id", "=", userId)
       .whereIn("statusRequest_id", arrayStatusreq)
+      .join("users", "request.user_id", "users.id")
       .join("deliveryType", "request.deliveryType_id", "deliveryType.id")
       .join("statusRequest", "request.statusRequest_id", "statusRequest.id")
       .join("payment", "request.payment_id", "payment.id")
       .select(
         "request.*",
+        "users.name",
+        "users.email",
+        "users.phone",
         "deliveryType.description As deliveryType",
         "statusRequest.description As statusRequest",
         "statusRequest.BGcolor",
-        "payment.type As payment"
+        "payment.type As payment",
+        "payment.image"
       )
       .orderBy("request.id", "desc");
 
-    const itemOrder = await listItemOrder(response);
+    const serialezeOrder = response.map((item) => {
+      return {
+        ...item,
+        image: `${process.env.HOST}/uploads/${item.image}`,
+      };
+    });
+
+    const itemOrder = await listItemOrder(serialezeOrder);
     return itemOrder;
   } catch (error) {
     return { error: error.message };
@@ -140,16 +167,41 @@ const listItemOrder = async (order) => {
       item: itensOrders
         .filter((itemOrder) => itemOrder.request_id === myOrders.id)
         .map((items) => {
+          const addit = additonalItensOrders.filter(
+            (elem) => elem.itemOrder_id === items.idItem
+          );
+          const additionalSum = addit.reduce(
+            (acc, item) => acc + Number(item.price),
+            0
+          );
+
           return {
             ...items,
-            total: Number(items.price) * Number(items.amount),
-            additional: additonalItensOrders.filter(
-              (elem) => elem.itemOrder_id === items.idItem
-            ),
+            total: (Number(items.price) + additionalSum) * Number(items.amount),
+            totalAdditional: additionalSum,
+            additional: addit,
           };
         }),
     };
   });
 
   return joinMyOrderWithItemsAddit;
+};
+
+const listAdditionalStringObject = async (additional) => {
+  if (additional === "") return { listAdditinal: [], additionalSum: 0 };
+
+  // Converter a string que contém o itens adicionais em ARRAY
+  const itemAddit = additional.split(",").flat(Infinity);
+
+  // Buscar todos os dados dos adicionais escolhido
+  const listAdditinal = await connection("additional").whereIn("id", itemAddit);
+
+  // soma de Todos os Adicionais
+  const additionalSum = listAdditinal.reduce(
+    (acc, item) => acc + Number(item.price),
+    0
+  );
+
+  return { listAdditinal, additionalSum };
 };

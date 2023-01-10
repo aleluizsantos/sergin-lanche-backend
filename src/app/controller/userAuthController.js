@@ -151,7 +151,7 @@ router.get("/users", async (req, res) => {
       "addressUser.neighborhood",
       "addressUser.city"
     )
-    .orderBy("name", "asc");
+    .orderBy("created_at", "desc");
 
   return res.json(users);
 });
