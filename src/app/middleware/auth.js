@@ -31,18 +31,21 @@ module.exports = (req, res, next) => {
     if (err)
       return res.status(401).send({ error: "Token invalido ou expirou" });
 
-    const user = await connection("users").where("id", "=", decoded.id).first();
-    if (!!user) {
-      // if (user.tokenPushNotification !== tokenPushNotification) {
-      //   await connection("users").where("id", "=", decoded.id).update({
-      //     tokenPushNotification,
-      //   });
-      // }
-      req.userId = decoded.id;
-      return next();
-    } else {
-      return res.status("401").send({ error: "Usuário não cadastrado" });
-      // return res.json({ error: "Usuário não cadastrado" });
-    }
+    req.userId = decoded.id;
+    return next();
+
+    // const user = await connection("users").where("id", "=", decoded.id).first();
+    // if (!!user) {
+    //   // if (user.tokenPushNotification !== tokenPushNotification) {
+    //   //   await connection("users").where("id", "=", decoded.id).update({
+    //   //     tokenPushNotification,
+    //   //   });
+    //   // }
+    //   // req.userId = decoded.id;
+    //   // return next();
+    // } else {
+    //   return res.status("401").send({ error: "Usuário não cadastrado" });
+    //   // return res.json({ error: "Usuário não cadastrado" });
+    // }
   });
 };

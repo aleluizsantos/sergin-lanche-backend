@@ -1,6 +1,11 @@
 const connection = require("../../database/connection");
 const express = require("express");
+
 const authMiddleware = require("../middleware/auth");
+const {
+  scheduleAutoActiveOpen,
+  scheduleAutoActiveClose,
+} = require("../utils/checkOperationStore");
 
 const router = express.Router();
 
@@ -8,7 +13,9 @@ const router = express.Router();
 // http://dominio/status
 router.get("/", async (req, res) => {
   const taxaDelivery = await connection("taxaDelivery").first().select("*");
-  const deliveryTyper = await connection("deliveryType").select("*");
+  const deliveryTyper = await connection("deliveryType")
+    .orderBy("description", "asc")
+    .select("*");
   const operation = await connection("operation").first().select("*");
 
   return res.json({
@@ -48,6 +55,23 @@ router.put("/", async (req, res) => {
   } catch (error) {
     return res.json({ Message: "Erro", typeErro: error });
   }
+});
+
+router.post("/active-auto-open-close", async (req, res) => {
+  const { state } = req.body;
+
+  if (state) {
+    (await scheduleAutoActiveOpen(req)).start();
+    (await scheduleAutoActiveClose(req)).start();
+  } else {
+    (await scheduleAutoActiveOpen(req)).stop();
+    (await scheduleAutoActiveClose(req)).stop();
+  }
+  return res.status(200).json({
+    message: `Abertura e fechamento automático ${
+      state ? "ativado" : "desativado"
+    }.`,
+  });
 });
 
 module.exports = (app) => app.use("/operation", router);

@@ -1,11 +1,10 @@
-const connection = require("../../database/connection");
+// const connection = require("../../database/connection");
 const jwt = require("jsonwebtoken");
 
 module.exports = (req, res, next) => {
   //Passado na requisição no Headers authorization o token que foi gerado
   //Na authenticate da aplicação do authController
   const authHeader = req.headers.authorization;
-
   //Verificar se o token foi informado
   if (!authHeader) {
     req.userId = null;
@@ -35,17 +34,20 @@ module.exports = (req, res, next) => {
       return next();
     }
 
-    const user = await connection("users").where("id", "=", decoded.id).first();
-    if (!!user) {
-      // if (user.tokenPushNotification !== tokenPushNotification) {
-      //   await connection("users").where("id", "=", decoded.id).update({
-      //     tokenPushNotification,
-      //   });
-      // }
-      req.userId = decoded.id;
-      return next();
-    } else {
-      return res.status("401").send({ error: "Usuário não cadastrado" });
-    }
+    req.userId = decoded.id;
+    return next();
+
+    // const user = await connection("users").where("id", "=", decoded.id).first();
+    // if (!!user) {
+    // if (user.tokenPushNotification !== tokenPushNotification) {
+    //   await connection("users").where("id", "=", decoded.id).update({
+    //     tokenPushNotification,
+    //   });
+    // }
+    // req.userId = decoded.id;
+    // return next();
+    // } else {
+    //   return res.status("401").send({ error: "Usuário não cadastrado" });
+    // }
   });
 };

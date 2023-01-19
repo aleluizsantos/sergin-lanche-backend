@@ -8,9 +8,7 @@ require("dotenv").config();
 const errorHandler = require("./errors/handler");
 const app = express();
 
-const { NODE_INSTANCE } = process.env;
 const PORT = process.env.PORT;
-const HOST = process.env.HOST;
 
 //Fazer com que a aplicação ousa tanto o protocolo http quanto socket
 const server = require("http").Server(app);

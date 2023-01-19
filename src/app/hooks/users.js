@@ -12,6 +12,7 @@ const user = async (userId) => {
     .first()
     .select("id", "name", "email", "phone", "typeUser");
 };
+
 const userAll = async () => {
   return await connection("users").select(
     "id",

@@ -53,6 +53,7 @@ router.post("/create", async (req, res) => {
 
   return res.json({ id: insertId[0], ...openingHours });
 });
+
 /**
  * Excluir um horário de atendimento
  */

@@ -1,7 +1,12 @@
 const connection = require("../../database/connection");
 const express = require("express");
 const authMiddleware = require("../middleware/auth");
-const { getOrder, getAdditional } = require("../hooks/myOrders");
+const {
+  getOrder,
+  getAdditional,
+  checkCalcTaxaDelivery,
+  addToCommad,
+} = require("../hooks/myOrders");
 const { validationCoupon } = require("../utils/validationCupon");
 const { pushNotificationUser } = require("../utils/pushNotification");
 
@@ -86,6 +91,7 @@ router.post("/create", async (req, res) => {
 
   // Dados recebidos na requisição no body
   const {
+    commads_id,
     deliveryType_id, // recebendo o id do tipo de entrega
     statusRequest_id = 1, //Status do pedido inicia como 1 'EM ANALISE'
     payment_id, // recebendo o id do tipo de pagamento
@@ -140,24 +146,26 @@ router.post("/create", async (req, res) => {
       return total + amount * price;
     }, 0);
 
+    // Checando a taxa de entrega
+    vTaxaDelivery = await checkCalcTaxaDelivery(totalPur, deliveryType_id);
+
+    // Total geral da Compra
+    totalPur += vTaxaDelivery;
+
+    // Se o tipo do pedido for Atendimento Mesa
+    // Adiconar o valor na Commada
+    addToCommad(commads_id, totalPur, deliveryType_id);
+
     //Verificação do cupom, autenticidade e validade
     if (coupon !== "") {
       const vcoupon = await validationCoupon(coupon);
       vDiscount = vcoupon.error ? 0 : Number(vcoupon.discountAmount);
     }
 
-    // Checando a taxa de entrega
-    const { vMinTaxa, taxa } = await connection("taxaDelivery").first();
-    // Checar se o total gasto é maior ou igual a taxa minima de entrega
-    if (deliveryType_id === 1) {
-      vTaxaDelivery =
-        totalPur >= vMinTaxa && vMinTaxa > 0 ? 0 : parseFloat(taxa);
-    }
-
     // Montar os dados do pedido para ser inseridos
     const request = {
       dateTimeOrder: dataCurrent,
-      totalPurchase: vTaxaDelivery + totalPur - vDiscount,
+      totalPurchase: totalPur - vDiscount,
       cash: cash || 0,
       vTaxaDelivery: vTaxaDelivery,
       coupon,
@@ -174,6 +182,7 @@ router.post("/create", async (req, res) => {
       deliveryType_id: Number(deliveryType_id),
       statusRequest_id: Number(statusRequest_id),
       payment_id: Number(payment_id),
+      commads_id: Number(commads_id),
     };
 
     const trx = await connection.transaction();
