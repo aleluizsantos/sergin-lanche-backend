@@ -13,9 +13,11 @@ const router = express.Router();
 // http://dominio/status
 router.get("/", async (req, res) => {
   const taxaDelivery = await connection("taxaDelivery").first().select("*");
+
   const deliveryTyper = await connection("deliveryType")
     .orderBy("description", "asc")
     .select("*");
+
   const operation = await connection("operation").first().select("*");
 
   return res.json({

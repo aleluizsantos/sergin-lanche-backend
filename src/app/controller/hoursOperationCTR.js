@@ -56,7 +56,7 @@ router.put("/update/:id", async (req, res) => {
       hourEnd: hourEndToMinutes,
     });
 
-    return res.status(201).json({
+    return res.status(200).json({
       message: "Horário de funcionamento do estabelecimento Atualizado.",
       hourStart,
       hourEnd,

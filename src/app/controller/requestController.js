@@ -1,12 +1,15 @@
 const connection = require("../../database/connection");
 const express = require("express");
+
 const authMiddleware = require("../middleware/auth");
+
 const {
   getOrder,
   getAdditional,
   checkCalcTaxaDelivery,
   addToCommad,
 } = require("../hooks/myOrders");
+
 const { validationCoupon } = require("../utils/validationCupon");
 const { pushNotificationUser } = require("../utils/pushNotification");
 
@@ -92,6 +95,8 @@ router.post("/create", async (req, res) => {
   // Dados recebidos na requisição no body
   const {
     commads_id,
+    table_id,
+    name_client,
     deliveryType_id, // recebendo o id do tipo de entrega
     statusRequest_id = 1, //Status do pedido inicia como 1 'EM ANALISE'
     payment_id, // recebendo o id do tipo de pagamento
@@ -101,6 +106,7 @@ router.post("/create", async (req, res) => {
     number,
     neighborhood,
     city,
+    phone,
     uf,
     PointReferences,
     cash, //Troco
@@ -175,6 +181,7 @@ router.post("/create", async (req, res) => {
       address,
       number,
       neighborhood,
+      phone,
       city,
       uf,
       PointReferences,
@@ -183,6 +190,8 @@ router.post("/create", async (req, res) => {
       statusRequest_id: Number(statusRequest_id),
       payment_id: Number(payment_id),
       commads_id: Number(commads_id),
+      table_id: table_id,
+      name_client: name_client,
     };
 
     const trx = await connection.transaction();
@@ -238,10 +247,10 @@ router.post("/create", async (req, res) => {
     });
 
     // Retorna o Pedido e os itens
-    return res.json({ request, itemsRequest });
+    return res.status(201).json({ request, itemsRequest });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ error: error.message });
+    console.log(error.message);
+    return res.status(400).json({ error: error.message });
   }
 });
 //Criar item do pedido
@@ -380,23 +389,27 @@ router.put("/", async (req, res) => {
       break;
   }
 
-  // Atualizar o status do pedido
-  const upgradeRequest = await connection("request")
-    .where("id", "=", id)
-    .update({ statusRequest_id: stage });
+  try {
+    // Atualizar o status do pedido
+    const upgradeRequest = await connection("request")
+      .where("id", "=", id)
+      .update({ statusRequest_id: stage });
 
-  // Enviar pushNotification para o usuário
-  stage > 1 && pushNotificationUser(user_id, message);
+    // Enviar pushNotification para o usuário
+    stage > 1 && pushNotificationUser(user_id, message);
 
-  // Enviar notificação via socket-io
-  req.io.emit("Update", { update: Date.now(), userId: user_id });
+    // Enviar notificação via socket-io
+    req.io.emit("Update", { update: Date.now(), userId: user_id });
 
-  return res.status(200).json({
-    success: Boolean(upgradeRequest),
-    user_id: user_id,
-    nextState: nextActionRequest,
-    descriptionNextActionRequest: descriptionNextActionRequest,
-  });
+    return res.status(200).json({
+      success: Boolean(upgradeRequest),
+      user_id: user_id,
+      nextState: nextActionRequest,
+      descriptionNextActionRequest: descriptionNextActionRequest,
+    });
+  } catch (error) {
+    return res.json(error.message);
+  }
 });
 // Alterar colocar com true a impressão
 // http://dominio/request/:id

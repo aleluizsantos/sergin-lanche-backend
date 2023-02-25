@@ -71,28 +71,33 @@ router.delete("/delete/:id", async (req, res) => {
 /**
  * Atualizar os valores do horáiros
  */
-router.put("/update/:id", async (req, res) => {
-  const { id } = req.params;
-  const openingHours = ({ week, week_id, start, end } = req.body);
+router.put("/update", async (req, res) => {
+  const openingHours = req.body;
+  let errors = [];
 
   const schema = Yup.object({
+    open: Yup.bool().required(),
     week: Yup.string().required(),
     week_id: Yup.number().required(),
     start: Yup.string().required(),
     end: Yup.string().required(),
   });
 
-  if (!schema.isValidSync(openingHours)) {
-    return res.json({ error: "Validation data" });
+  for (const hour of openingHours) {
+    if (!schema.isValidSync(hour)) {
+      errors = [...errors, hour];
+    } else {
+      // Se não tiver error atualiza
+      await connection("openingHours").where("id", "=", hour.id).update(hour);
+    }
   }
 
-  const isUpdate = await connection("openingHours")
-    .where("id", "=", id)
-    .update(openingHours);
-
   return res.json({
-    success: Boolean(isUpdate),
-    message: isUpdate ? "Item foi atualizado." : "Falha ao atualizar o item.",
+    message:
+      errors.length >= 0
+        ? "Alguns horários pode não ter atualizado"
+        : "Horários atualizados",
+    errors: errors,
   });
 });
 

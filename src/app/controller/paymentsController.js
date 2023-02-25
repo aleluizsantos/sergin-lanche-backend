@@ -9,12 +9,14 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   const payment = await connection("payment")
     .where("active", "=", true)
-    .select("*");
+    .select("*")
+    .orderBy("id", "asc");
 
   const serialezePayment = payment.map((pay) => {
     return {
       id: pay.id,
       type: pay.type,
+      active: pay.active,
       image_url: `${process.env.HOST}/uploads/${pay.image}`,
       key_pix: pay.key_pix,
     };
@@ -25,8 +27,18 @@ router.get("/", async (req, res) => {
 // Listar todas tipos de pagamentos ativos e desativados
 // http://dominio/payment/all
 router.get("/all", async (req, res) => {
-  const payment = await connection("payment").select("*");
-  return res.json(payment);
+  const payment = await connection("payment").select("*").orderBy("id", "asc");
+
+  const serialezePayment = payment.map((pay) => {
+    return {
+      id: pay.id,
+      type: pay.type,
+      active: pay.active,
+      image_url: `${process.env.HOST}/uploads/${pay.image}`,
+      key_pix: pay.key_pix,
+    };
+  });
+  return res.json(serialezePayment);
 });
 // Lista uma um pagamento específico
 // http://dominio/payment/:id
@@ -54,12 +66,15 @@ router.post("/create", async (req, res) => {
 // http://dominio/payment/:id
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { type } = req.body;
+  const { active, key_pix } = req.body;
 
   try {
-    await connection("payment").where("id", "=", id).update({
-      type,
-    });
+    await connection("payment")
+      .where("id", "=", id)
+      .update({
+        active,
+        key_pix: key_pix === "" ? null : key_pix,
+      });
 
     return res.json({ message: "Atualização realizada com sucesso" });
   } catch (error) {
@@ -70,12 +85,11 @@ router.put("/:id", async (req, res) => {
 // http://dominio/payment/active/:id
 router.put("/active/:id", async (req, res) => {
   const { id } = req.params;
-
-  const active = await connection("payment").where("id", "=", id).select("*");
+  const { active } = req.body;
 
   try {
     await connection("payment").where("id", "=", id).update({
-      active: !active[0].active,
+      active: active,
     });
 
     return res.json({ message: "Atualização realizada com sucesso" });

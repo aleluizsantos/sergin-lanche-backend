@@ -7,7 +7,7 @@ exports.up = async function (knex) {
 
 exports.down = async function (knex) {
   return knex.schema.table("request", (table) => {
-    table.dropColumns("commads_id");
     table.dropForeign("commads_id");
+    table.dropColumns("commads_id");
   });
 };

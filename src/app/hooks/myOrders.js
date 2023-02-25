@@ -68,7 +68,7 @@ async function orders(request) {
     const { typeUser } = await getUser(userId);
 
     const listOrder =
-      typeUser === "admin"
+      typeUser === "admin" || typeUser === "attendant"
         ? await listAllOrder(request) // Administrador
         : await listOrderUser(request, userId); // Usuário
 
@@ -103,7 +103,7 @@ async function listAllOrder(request) {
         "request.*",
         "users.name",
         "users.email",
-        "users.phone",
+        "users.phone As phoneOperator",
         "deliveryType.description As deliveryType",
         "statusRequest.description As statusRequest",
         "statusRequest.BGcolor",

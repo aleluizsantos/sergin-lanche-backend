@@ -1,10 +1,10 @@
 exports.seed = async function (knex) {
   await knex("payment").insert([
     { type: "Dinheiro", active: 1, image: "icoCast.png" },
-    { type: "Visa", active: 1, image: "icoVisa.png" },
-    { type: "Master Card", active: 1, image: "icoMast.png" },
-    { type: "Elo", active: 1, image: "icoElo.png" },
-    { type: "American Express", active: 1, image: "icoAEx.png" },
+    { type: "Cartão Crédito", active: 1, image: "icocartaocredito.png" },
+    { type: "Cartão Débito", active: 1, image: "iconcartaodebito.png" },
+    { type: "Pix", active: 1, image: "icopix.png" },
+    { type: "Nota", active: 0, image: "iconote.png" },
   ]);
 
   await knex("category").insert([

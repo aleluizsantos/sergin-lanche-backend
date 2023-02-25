@@ -13,6 +13,25 @@ function generateToken(params = {}) {
   });
 }
 
+// Checar se o usuário é administrador
+async function checkTokenAdmin(token) {
+  try {
+    const [scheme, token_user] = token.split(" ");
+    if (!/^Bearer$/i.test(scheme)) return false;
+    // Validando o TOKEN
+    const { id } = jwt.verify(token_user, process.env.AUTH_SECRET);
+    // Verificar se o usuário é um administrador
+    const isAdmin = await connection("users")
+      .where("id", "=", id)
+      .where("typeUser", "=", "admin")
+      .first();
+
+    return isAdmin ? true : false;
+  } catch (error) {
+    return false;
+  }
+}
+
 router.get("/checkToken/:token", async (req, res) => {
   // const user_id = req.userId;
   const { token } = req.params;
@@ -39,41 +58,71 @@ router.get("/checkToken/:token", async (req, res) => {
 // Criar um usuário
 // http://dominio/auth/register
 router.post("/register", async (req, res) => {
-  const { name, email, phone, password, tokenPushNotification } = req.body;
+  const { authorization } = req.headers;
+  const {
+    name,
+    email,
+    phone,
+    password,
+    tokenPushNotification,
+    type_user = "user",
+  } = req.body;
 
+  // Verificar se todos os paramentos obrigatórios foram passados
   if (name === "" || email === "" || phone === "" || password === "")
     return res.status(400).send({ error: "campos obrigatórios" });
 
-  // Verificação se email já esta cadastrado
-  const existUser = await connection("users").where("email", "=", email);
-
-  if (existUser.length > 0)
-    return res.status(400).send({ error: "E-mail já cadastrado" });
+  // Verificar se foi passado um token
+  if (typeof authorization === "undefined")
+    return res.json({ message: "No token defined" });
 
   // Cryptografar a senha
   const crypPassword = await bcrypt.hash(password, 10);
 
+  let user = {
+    name,
+    email,
+    phone,
+    typeUser: "user",
+    password: crypPassword,
+    tokenPushNotification,
+  };
+
   try {
-    const trx = await connection.transaction();
-    const user = {
-      name,
-      email,
-      phone,
-      password: crypPassword,
-      tokenPushNotification,
-    };
-    await trx("users").insert(user);
-    await trx.commit();
+    const isTokenValid = await checkTokenAdmin(authorization);
 
-    const totalUsers = await connection("users")
-      .count("id as countUser")
-      .first();
-    // emitir um aviso novo usuário criado retornando o total
-    req.io.emit("ClientsRegistered", totalUsers);
+    // o tipo de usuário pode ser alterado somente se o usuário for administrador
+    if (isTokenValid) {
+      user = { ...user, typeUser: type_user };
+    } else
+      return res
+        .status(400)
+        .send({ error: "Token inválido ou usuário não tem permissão." });
 
-    return res.json({ Message: "Success", user });
+    // Salvar o usuário
+    try {
+      user = await connection("users")
+        .returning([
+          "id",
+          "blocked",
+          "created_at",
+          "email",
+          "name",
+          "password",
+          "passwordResetExpires",
+          "passwordResetToken",
+          "phone",
+          "tokenPushNotification",
+          "typeUser",
+        ])
+        .insert(user);
+    } catch (error) {
+      return res.status(400).json({ message: "E-mail informado já em uso." });
+    }
+
+    return res.json(user[0]);
   } catch (error) {
-    return res.json({ Error: "Falha na insersão de dados" });
+    return res.status(400).json({ error: error.message });
   }
 });
 // Autenticação de usuário
@@ -132,9 +181,8 @@ router.use(authMiddleware);
 // http:dominio/auth/users
 router.get("/users", async (req, res) => {
   const users = await connection("users")
-    .where("typeUser", "=", "user")
-    .join("addressUser", "users.id", "addressUser.user_id")
-    .where("addressUser.active", "=", true)
+    .where("typeUser", "<>", "admin")
+    .leftJoin("addressUser", "users.id", "addressUser.user_id")
     .select(
       "users.id",
       "users.name",
@@ -153,7 +201,15 @@ router.get("/users", async (req, res) => {
     )
     .orderBy("created_at", "desc");
 
-  return res.json(users);
+  return res.status(200).json(users);
+});
+
+router.get("/user-system", async (req, res) => {
+  const userSystem = await connection("users").whereIn("typeUser", [
+    "admin",
+    "attendant",
+  ]);
+  return res.status(200).json(userSystem);
 });
 
 // Listar todos usuários específica
@@ -219,38 +275,45 @@ router.get("/blocked/:id", async (req, res) => {
 // Deletar um usuário
 router.delete("/userDelete/:id", async (req, res) => {
   const { id } = req.params;
-  const user_id = req.userId; //Id do usuário recebido no token;
-  const userAdm = await connection("users")
-    .where("id", "=", user_id)
-    .where("typeUser", "=", "admin")
-    .first();
+  const { authorization } = req.headers;
 
-  if (userAdm !== undefined) {
-    const user = await connection("users").where("id", "=", id).delete();
-    return res.json(user); //Returna 1=True excluido | 0=Falha na exclusão
-  } else {
+  const isAdmin = await checkTokenAdmin(authorization);
+
+  if (!isAdmin)
     return res.json({
       message: "Usuário não tem permissão para realizar esta ação.",
     });
-  }
+
+  const user = await connection("users").where("id", "=", id).delete();
+  return res.json({
+    message: Boolean(user) ? "Usuário foi apagado." : "Falha na exclusão",
+  });
 });
 // Atualizar os dados de um usuário
 router.put("/users/:id", async (req, res) => {
   const idUserLogin = req.userId;
+  const { authorization } = req.headers;
   const { id } = req.params;
-  const { name, email, phone, tokenPushNotification } = req.body;
+  const { name, email, phone, blocked, tokenPushNotification } = req.body;
   let statusUpgrade = false;
+
+  const isAdmin = await checkTokenAdmin(authorization);
 
   try {
     // Checar se o usuário logado é o mesmo que esta alterando os dados
-    if (Number(idUserLogin) === Number(id)) {
+    if (Number(idUserLogin) === Number(id) || isAdmin) {
       await connection("users")
         .where("id", "=", id)
-        .update({ name, email, phone, tokenPushNotification });
+        .update({ name, email, phone, blocked, tokenPushNotification });
       statusUpgrade = true;
     }
 
-    return res.json({ success: statusUpgrade });
+    return res.json({
+      success: statusUpgrade,
+      message: statusUpgrade
+        ? "Alteração realizada com sucesso"
+        : "Acesso negado, você não tem permissão para alterar os dados",
+    });
   } catch (error) {
     return res.json({
       success: false,

@@ -88,23 +88,13 @@ router.get("/all", async (req, res) => {
  * @param category_id id da categoria
  */
 router.get("/", async (req, res) => {
-  const userId = req.userId;
   const { category_id } = req.query;
   let totalProducts = 0;
 
   const categorys = category_id.split(",").map((cat) => Number(cat.trim()));
 
-  let isAdmin;
-
-  if (userId === null || typeof userId === "undefined") {
-    isAdmin = [true];
-  } else {
-    const user = await connection("users").where("id", "=", userId).first();
-    isAdmin = user.typeUser === "admin" ? [true, false] : [true];
-  }
-
   const products = await connection("product")
-    .whereIn("visibleApp", isAdmin)
+    .where("visibleApp", true)
     .whereIn("product.category_id", categorys)
     .join("category", "product.category_id", "category.id")
     .join("measureUnid", "product.measureUnid_id", "measureUnid.id")

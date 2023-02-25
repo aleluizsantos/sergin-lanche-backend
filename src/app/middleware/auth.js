@@ -1,11 +1,11 @@
-const connection = require("../../database/connection");
+// const connection = require("../../database/connection");
 const jwt = require("jsonwebtoken");
 
 module.exports = (req, res, next) => {
   //Passado na requisição no Headers authorization o token que foi gerado
   //Na authenticate da aplicação do authController
   const authHeader = req.headers.authorization;
-  const tokenPushNotification = req.headers.tokenpushnotification;
+  // const tokenPushNotification = req.headers.tokenpushnotification;
 
   //Verificar se o token foi informado
   if (!authHeader) return res.status(401).send({ error: "No token provided" });
