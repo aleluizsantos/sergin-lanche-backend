@@ -59,22 +59,12 @@ router.get("/checkToken/:token", async (req, res) => {
 // http://dominio/auth/register
 router.post("/register", async (req, res) => {
   const { authorization } = req.headers;
-  const {
-    name,
-    email,
-    phone,
-    password,
-    tokenPushNotification,
-    type_user = "user",
-  } = req.body;
+  const { name, email, phone, password, tokenPushNotification, type_user } =
+    req.body;
 
   // Verificar se todos os paramentos obrigatórios foram passados
   if (name === "" || email === "" || phone === "" || password === "")
     return res.status(400).send({ error: "campos obrigatórios" });
-
-  // Verificar se foi passado um token
-  if (typeof authorization === "undefined")
-    return res.json({ message: "No token defined" });
 
   // Cryptografar a senha
   const crypPassword = await bcrypt.hash(password, 10);
@@ -87,42 +77,33 @@ router.post("/register", async (req, res) => {
     password: crypPassword,
     tokenPushNotification,
   };
+  // Verificar se é um token valido e se é adminitrador
+  const isTokenValid = await checkTokenAdmin(authorization);
 
+  // O tipo de usuário pode ser alterado somente se o usuário for administrador
+  if (isTokenValid) {
+    user = { ...user, typeUser: type_user || "user" };
+  }
+  // Salvar o usuário
   try {
-    const isTokenValid = await checkTokenAdmin(authorization);
-
-    // o tipo de usuário pode ser alterado somente se o usuário for administrador
-    if (isTokenValid) {
-      user = { ...user, typeUser: type_user };
-    } else
-      return res
-        .status(400)
-        .send({ error: "Token inválido ou usuário não tem permissão." });
-
-    // Salvar o usuário
-    try {
-      user = await connection("users")
-        .returning([
-          "id",
-          "blocked",
-          "created_at",
-          "email",
-          "name",
-          "password",
-          "passwordResetExpires",
-          "passwordResetToken",
-          "phone",
-          "tokenPushNotification",
-          "typeUser",
-        ])
-        .insert(user);
-    } catch (error) {
-      return res.status(400).json({ message: "E-mail informado já em uso." });
-    }
-
+    user = await connection("users")
+      .returning([
+        "id",
+        "blocked",
+        "created_at",
+        "email",
+        "name",
+        "password",
+        "passwordResetExpires",
+        "passwordResetToken",
+        "phone",
+        "tokenPushNotification",
+        "typeUser",
+      ])
+      .insert(user);
     return res.json(user[0]);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ message: "E-mail informado já em uso." });
   }
 });
 // Autenticação de usuário
